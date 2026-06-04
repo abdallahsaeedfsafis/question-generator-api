@@ -1,19 +1,14 @@
-# ===================== API =====================
-fastapi==0.115.0
-uvicorn[standard]==0.30.6
-python-multipart==0.0.9
-pydantic==2.9.2
 
-# ===================== ENV =====================
-python-dotenv==1.0.1
-
-# ===================== TEXT EXTRACTION =====================
-pytesseract==0.3.13
-pdfplumber==0.11.4
-pdf2image==1.17.0
-Pillow==10.4.0
-python-docx==1.1.2
-python-pptx==1.0.2
-
-# ===================== AI =====================
-requests==2.32.3
+pydantic
+python-pptx
+python-dotenv
+fastapi
+uvicorn
+python-multipart
+pytesseract
+pdfplumber
+pdf2image
+Pillow
+python-docx
+pptx
+groq

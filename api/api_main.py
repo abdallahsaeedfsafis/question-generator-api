@@ -51,10 +51,10 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=ALLOWED_ORIGINS,
+    allow_origins=["*"],           # يسمح للفرونت إند الخارجي بالاتصال بالباك إند أونلاين
     allow_credentials=True,
-    allow_methods=["POST", "GET"],
-    allow_headers=["*"],
+    allow_methods=["POST", "GET"],           # يسمح بجميع الطرق بما فيها OPTIONS و POST و GET
+    allow_headers=["*"],           # يسمح بجميع الـ Headers المرسلة من المتصفح
 )
 
 app.add_middleware(

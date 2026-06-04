@@ -1,10 +1,14 @@
-import requests
+import os
 import re
+from groq import Groq
+from api.config import GROQ_API_KEY, GROQ_MODEL  # هذا السطر الجديد
 
 # ===================== CONFIG =====================
 
-OLLAMA_URL = "http://localhost:11434/api/generate"
-MODEL = "qwen2.5:7b-instruct"
+# تهيئة عميل Groq
+groq_client = Groq(api_key=GROQ_API_KEY)
+
+
 
 # ===================== DETECTORS =====================
 
@@ -82,7 +86,7 @@ def clean_ocr_noise(text):
         normal_chars = len(re.findall(
             r'[a-zA-Z\u0600-\u06FF0-9\s\.\,\:\;\-\(\)]', stripped
         ))
-        ratio = normal_chars / len(stripped)
+        ratio = normal_chars / len(stripped) if len(stripped) > 0 else 1
         if ratio >= 0.6:
             clean_lines.append(line)
     result = "\n".join(clean_lines)
@@ -288,31 +292,46 @@ Content:
 Generate {num_questions} essay questions now:"""
 
 
-# ===================== OLLAMA CALLER =====================
+# ===================== GROQ CALLER (بدلاً من Ollama) =====================
 
-def call_ollama(prompt):
-    payload = {
-        "model": MODEL,
-        "prompt": prompt,
-        "stream": False,
-        "options": {
-            "temperature": 0.7,
-            "top_p": 0.9,
-            "num_predict": 2000
-        }
-    }
+def call_groq(prompt):
+    """
+    استدعاء Groq API بدلاً من Ollama
+    """
     try:
-        response = requests.post(OLLAMA_URL, json=payload, timeout=120)
-        response.raise_for_status()
-        return response.json().get("response", "").strip()
-    except requests.exceptions.Timeout:
-        print("Error: Ollama took too long to respond (>120s)")
-        return ""
-    except requests.exceptions.ConnectionError:
-        print("Error: Cannot connect to Ollama. Make sure it is running.")
-        return ""
+        # استخدام عميل Groq
+        chat_completion = groq_client.chat.completions.create(
+            messages=[
+                {
+                    "role": "user",
+                    "content": prompt,
+                }
+            ],
+            model=GROQ_MODEL,
+            temperature=0.7,
+            max_tokens=2048,  # زيادة لاستيعاب الأجوبة الطويلة
+            top_p=0.9,
+        )
+        
+        response = chat_completion.choices[0].message.content
+        
+        if not response:
+            print("Warning: Groq returned an empty response")
+            return ""
+        
+        return response.strip()
+        
     except Exception as e:
-        print(f"Error: {e}")
+        print(f"Error calling Groq API: {e}")
+        
+        # معالجة أخطاء محددة
+        if "rate_limit" in str(e).lower():
+            print("Rate limit exceeded. Please wait a moment and try again.")
+        elif "api_key" in str(e).lower():
+            print("Invalid Groq API key. Check your GROQ_API_KEY environment variable.")
+        elif "connection" in str(e).lower():
+            print("Cannot connect to Groq API. Check your internet connection.")
+        
         return ""
 
 
@@ -346,7 +365,7 @@ def generate_all_questions(text, num_mcq=5, num_tf=2, num_essay=2):
     # ── MCQ ───────────────────────────────────────────────
     if num_mcq > 0:
         print(f"Generating {num_mcq} MCQ questions...")
-        mcq = call_ollama(build_mcq_prompt(main_chunk, num_mcq, lang, content_type))
+        mcq = call_groq(build_mcq_prompt(main_chunk, num_mcq, lang, content_type))
         if mcq:
             mcq = remove_forbidden_phrases(mcq)
             results.append("[ Multiple Choice Questions ]\n\n" + mcq)
@@ -354,7 +373,7 @@ def generate_all_questions(text, num_mcq=5, num_tf=2, num_essay=2):
     # ── True/False ────────────────────────────────────────
     if num_tf > 0:
         print(f"Generating {num_tf} True/False questions...")
-        tf = call_ollama(build_tf_prompt(main_chunk, num_tf, lang, content_type))
+        tf = call_groq(build_tf_prompt(main_chunk, num_tf, lang, content_type))
         if tf:
             tf = remove_forbidden_phrases(tf)
             results.append("[ True / False Questions ]\n\n" + tf)
@@ -362,10 +381,27 @@ def generate_all_questions(text, num_mcq=5, num_tf=2, num_essay=2):
     # ── Essay ─────────────────────────────────────────────
     if num_essay > 0:
         print(f"Generating {num_essay} Essay questions...")
-        essay = call_ollama(build_essay_prompt(main_chunk, num_essay, lang, content_type))
+        essay = call_groq(build_essay_prompt(main_chunk, num_essay, lang, content_type))
         if essay:
             essay = remove_forbidden_phrases(essay)
             results.append("[ Essay Questions ]\n\n" + essay)
 
     separator = "\n\n" + "─" * 50 + "\n\n"
-    return "\n\n" + separator.join(results)
+    final_result = "\n\n" + separator.join(results) if results else ""
+    
+    return final_result
+
+
+# ===================== EXAMPLE USAGE =====================
+if __name__ == "__main__":
+    # قراءة ملف مثال
+    try:
+        with open("sample_text.txt", "r", encoding="utf-8") as f:
+            file_content = f.read()
+        
+        # توليد الأسئلة
+        questions = generate_all_questions(file_content, num_mcq=3, num_tf=1, num_essay=1)
+        print(questions)
+        
+    except FileNotFoundError:
+        print("Please create a file named 'sample_text.txt' with your content")

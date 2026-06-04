@@ -13,9 +13,9 @@ load_dotenv()
 HOST = os.getenv("HOST", "127.0.0.1")
 PORT = int(os.getenv("PORT", 8000))
 
-# ── Ollama ────────────────────────────────────────────────
-OLLAMA_URL   = os.getenv("OLLAMA_URL",   "http://localhost:11434/api/generate")
-OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "qwen2.5:7b-instruct")
+# ── Groq API (بدلاً من Ollama) ───────────────────────────
+GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
+GROQ_MODEL   = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
 
 # ── File Upload ───────────────────────────────────────────
 MAX_FILE_SIZE_MB   = int(os.getenv("MAX_FILE_SIZE_MB", 20))
