@@ -12,7 +12,7 @@ from difflib import SequenceMatcher
 
 # ===================== CONFIG =====================
 
-pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
+# pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
 POPPLER_PATH = r"C:\poppler\Library\bin"
 
 DEFAULT_LANG = "ara+eng"  # يدعم العربي والإنجليزي مع بعض
