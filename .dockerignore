@@ -4,7 +4,6 @@ env/
 ENV/
 .env
 .env.local
-frontend/
 node_modules/
 dist/
 build/
@@ -20,3 +19,4 @@ Dockerfile
 .dockerignore
 .DS_Store
 Thumbs.db
+frontend/
