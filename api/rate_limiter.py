@@ -9,7 +9,7 @@ rate_limiter.py
 import time
 from collections import defaultdict
 from fastapi import Request, HTTPException
-from config import RATE_LIMIT_REQUESTS, RATE_LIMIT_WINDOW
+from .config import RATE_LIMIT_REQUESTS, RATE_LIMIT_WINDOW
 
 
 class RateLimiter:

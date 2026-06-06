@@ -9,7 +9,7 @@ file_validator.py
 
 import os
 from fastapi import UploadFile, HTTPException
-from config import ALLOWED_EXTENSIONS, MAX_FILE_SIZE_BYTES
+from .config import ALLOWED_EXTENSIONS, MAX_FILE_SIZE_BYTES
 
 
 # ===================== MAGIC BYTES =====================
