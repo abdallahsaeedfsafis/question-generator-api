@@ -14,9 +14,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from pydantic import BaseModel
 
-from config import ALLOWED_ORIGINS, UPLOAD_DIR
-from file_validator import validate_file
-from rate_limiter import rate_limit_middleware, limiter
+from .config import ALLOWED_ORIGINS, UPLOAD_DIR
+from .file_validator import validate_file
+from .rate_limiter import rate_limit_middleware, limiter
 
 import sys
 sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
@@ -179,7 +179,7 @@ async def generate(
 
 if __name__ == "__main__":
     import uvicorn
-    from config import HOST, PORT
+    from .config import HOST, PORT
 
     uvicorn.run(
         "api_main:app",
