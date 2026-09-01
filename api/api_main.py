@@ -186,7 +186,7 @@ if __name__ == "__main__":
     from .config import HOST, PORT
 
     uvicorn.run(
-        "api_main:app",
+        "api.api_main:app",
         host=HOST,
         port=PORT,
         reload=True,
