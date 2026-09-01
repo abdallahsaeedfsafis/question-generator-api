@@ -1,6 +1,23 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 
-const API_URL = "http://127.0.0.1:8000/generate";
+const resolveApiBaseUrl = () => {
+  const envUrl = import.meta.env?.VITE_API_URL?.trim();
+  if (envUrl) return envUrl.replace(/\/+$/, "");
+
+  if (typeof window !== "undefined") {
+    const { hostname } = window.location;
+    if (hostname === "localhost" || hostname === "127.0.0.1") {
+      return "http://127.0.0.1:8000";
+    }
+    if (hostname.includes("render.com") || hostname.includes("onrender.com")) {
+      return "https://question-generator-api-pol9.onrender.com";
+    }
+  }
+
+  return "http://127.0.0.1:8000";
+};
+
+const API_URL = `${resolveApiBaseUrl()}/generate`;
 const ALLOWED_EXT = [".pdf",".docx",".pptx",".txt",".png",".jpg",".jpeg",".bmp",".tiff"];
 const MAX_SIZE_MB  = 20;
 const HISTORY_KEY  = "quizforge_history";
