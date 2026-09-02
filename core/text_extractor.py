@@ -1,7 +1,15 @@
 import os
+import shutil
 import pytesseract
 import pdfplumber
-from pdf2image import convert_from_path
+try:
+    import fitz  # PyMuPDF
+except Exception:
+    fitz = None
+try:
+    from pdf2image import convert_from_path
+except Exception:
+    convert_from_path = None
 from PIL import Image
 from docx import Document
 import zipfile
@@ -12,10 +20,50 @@ from difflib import SequenceMatcher
 
 # ===================== CONFIG =====================
 
-pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
-POPPLER_PATH = r"C:\poppler\Library\bin"
+TESSERACT_CANDIDATES = [
+    os.environ.get("TESSERACT_PATH"),
+    r"C:\Program Files\Tesseract-OCR\tesseract.exe",
+    r"C:\Program Files (x86)\Tesseract-OCR\tesseract.exe",
+]
+
+for candidate in TESSERACT_CANDIDATES:
+    if candidate and os.path.exists(candidate):
+        pytesseract.pytesseract.tesseract_cmd = candidate
+        break
+else:
+    tesseract_cmd = shutil.which("tesseract")
+    if tesseract_cmd:
+        pytesseract.pytesseract.tesseract_cmd = tesseract_cmd
+
+POPPLER_PATH = os.environ.get("POPPLER_PATH") or r"C:\poppler\Library\bin"
 
 DEFAULT_LANG = "ara+eng"  # يدعم العربي والإنجليزي مع بعض
+
+
+def get_poppler_path():
+    """
+    يرجع مسار Poppler إن كان موجود، وإلا يرجع None.
+    الهدف: تجنب فشل استخراج PDF عندما يكون Poppler غير مثبت في الجهاز.
+    """
+    candidates = []
+    if POPPLER_PATH:
+        candidates.append(POPPLER_PATH)
+    candidates.extend([
+        os.environ.get("POPPLER_PATH"),
+        r"C:\poppler\Library\bin",
+        r"C:\Program Files\poppler\Library\bin",
+        r"C:\Program Files (x86)\poppler\Library\bin",
+    ])
+
+    for candidate in candidates:
+        if candidate and os.path.exists(candidate):
+            return candidate
+
+    pdftoppm = shutil.which("pdftoppm")
+    if pdftoppm:
+        return os.path.dirname(pdftoppm)
+
+    return None
 
 
 # ===================== SIMILARITY =====================
@@ -112,42 +160,66 @@ def extract_text_from_docx(docx_path, lang=DEFAULT_LANG):
 def extract_text_from_pdf(pdf_path, lang=DEFAULT_LANG):
     """
     بتستخرج النص من PDF بطريقتين مع بعض لكل صفحة:
-    1. النص المباشر من الملف (سريع ودقيق)
-    2. OCR على صورة الصفحة (بيلتقط النص داخل الصور)
+    1. النص المباشر من الملف باستخدام PyMuPDF / pdfplumber (بدون Poppler)
+    2. OCR على صورة الصفحة إذا توفر Poppler/Tesseract
     بعدها بتدمجهم وبتشيل التكرار بالـ similarity check
     """
     pages_text = []
+    images = []
 
-    images = convert_from_path(pdf_path, poppler_path=POPPLER_PATH)
+    # 1) جرب استخراج النص مباشرة بدون أي تبعية خارجية
+    if fitz is not None:
+        try:
+            doc = fitz.open(pdf_path)
+            for page in doc:
+                page_text = (page.get_text("text") or "").strip()
+                if page_text:
+                    pages_text.append(page_text)
+            doc.close()
+            if pages_text:
+                return "\n\n".join(pages_text)
+        except Exception as e:
+            print(f"Warning: PyMuPDF extraction failed for {pdf_path}: {e}")
 
-    with pdfplumber.open(pdf_path) as pdf:
-        for i, page in enumerate(pdf.pages):
-            normal_text = (page.extract_text() or "").strip()
+    # 2) fallback إلى pdfplumber
+    try:
+        with pdfplumber.open(pdf_path) as pdf:
+            for page in pdf.pages:
+                page_text = (page.extract_text() or "").strip()
+                if page_text:
+                    pages_text.append(page_text)
+        if pages_text:
+            return "\n\n".join(pages_text)
+    except Exception as e:
+        print(f"Warning: pdfplumber failed for {pdf_path}: {e}")
 
-            # OCR على كل صفحة دايماً (مش بس لو النص فاضي)
-            # لأن الصفحة ممكن تكون فيها نص + صورة بنفس الوقت
-            ocr_text = ""
-            if i < len(images):
-                try:
-                    ocr_text = pytesseract.image_to_string(images[i], lang=lang).strip()
-                except Exception as e:
-                    print(f"Warning: OCR failed on page {i + 1}: {e}")
+    # 3) OCR fallback فقط إذا أمكن تحويل الصفحات إلى صور
+    if convert_from_path is not None:
+        try:
+            poppler_path = get_poppler_path()
+            if poppler_path:
+                images = convert_from_path(pdf_path, poppler_path=poppler_path)
+            else:
+                images = convert_from_path(pdf_path)
+        except Exception as e:
+            print(f"Warning: PDF pages could not be converted to images: {e}")
+            images = []
 
-            # دمج النصين مع إزالة التكرار بالـ similarity
-            combined_lines = []
-            seen_set = set()
-            seen_list = []
+    for i, page_text in enumerate(pages_text):
+        # إذا كان النص موجود من الخطوات السابقة لا نحتاج OCR
+        pass
 
-            for source_text in [normal_text, ocr_text]:
-                if source_text:
-                    for line in source_text.splitlines():
-                        clean_line = line.strip()
-                        if clean_line and add_if_not_duplicate(clean_line, seen_set, seen_list):
-                            combined_lines.append(clean_line)
+    if images:
+        for i, image in enumerate(images):
+            try:
+                ocr_text = pytesseract.image_to_string(image, lang=lang).strip()
+                if ocr_text:
+                    pages_text.append(ocr_text)
+            except Exception as e:
+                print(f"Warning: OCR failed on page {i + 1}: {e}")
 
-            page_text = "\n".join(combined_lines).strip()
-            if page_text:
-                pages_text.append(page_text)
+    if not pages_text:
+        return ""
 
     return "\n\n".join(pages_text)
 

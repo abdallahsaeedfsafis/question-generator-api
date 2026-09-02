@@ -10,3 +10,4 @@ pdf2image
 Pillow
 python-docx
 groq
+PyMuPDF
